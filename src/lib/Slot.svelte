@@ -21,16 +21,33 @@
   const ink = $derived(t.plateFg ?? '#1b1714');
   const capFill = $derived(t.plateMuted ?? '#5f574f');
 
-  // wordmark: largest size that fits the inner box (width-bound for long names, height-bound for short)
+  // wordmark: largest size that fits the inner box (width-bound for long names, height-bound for short).
+  // wordmark.lines splits the name into a stacked, left-aligned block (e.g. STRUC / TURUM).
+  const LH = 0.98; // stacked line height, em: tight like a logo
   const wm = $derived.by(() => {
     if (!wordmark) return null;
     ready; // re-measure once embedded fonts are in
     const weight = wordmark.weight ?? 400;
     const sp = wordmark.spacing ?? 0;
-    const em = measure(text, wordmark.font, weight, sp);
+    const lines = wordmark.lines ?? [text];
+    const n = lines.length;
+    // letter-spacing also trails the last glyph; leave it out of the visible width
+    const em = Math.max(...lines.map((l) => measure(l, wordmark.font, weight, sp) - sp));
     // height cap keeps short, heavy names (3022) from out-weighing the image logos
-    const size = Math.min(box.w / em, box.h * 0.48);
-    return { size, weight, sp: sp * size, family: stack(wordmark.font) };
+    const hCap = n > 1 ? (box.h * 0.82) / ((n - 1) * LH + 0.72) : box.h * 0.48;
+    const size = Math.min(box.w / em, hCap);
+    const cx = box.x + box.w / 2;
+    const cy = box.y + box.h / 2;
+    return {
+      size,
+      weight,
+      sp: sp * size,
+      family: stack(wordmark.font),
+      x: n > 1 ? cx - (em * size) / 2 : cx,
+      anchor: n > 1 ? 'start' : 'middle',
+      // baselines spaced by LH around the box centre; 0.36em drops cap height onto the centre
+      rows: lines.map((l, i) => ({ text: l, y: cy + (i - (n - 1) / 2) * LH * size + size * 0.36 })),
+    };
   });
 </script>
 
@@ -51,16 +68,18 @@
     <image {href} x={box.x} y={box.y} width={box.w} height={box.h} preserveAspectRatio="xMidYMid meet" />
   {:else}
     <!-- trailing letter-spacing is added after the last glyph too, shift by half to stay centred -->
-    <text
-      x={box.x + box.w / 2 + wm.sp / 2}
-      y={box.y + box.h / 2 + wm.size * 0.36}
-      text-anchor="middle"
-      font-family={wm.family}
-      font-weight={wm.weight}
-      font-size={wm.size}
-      letter-spacing={wm.sp}
-      fill={ink}>{text}</text
-    >
+    {#each wm.rows as r}
+      <text
+        x={wm.anchor === 'middle' ? wm.x + wm.sp / 2 : wm.x}
+        y={r.y}
+        text-anchor={wm.anchor}
+        font-family={wm.family}
+        font-weight={wm.weight}
+        font-size={wm.size}
+        letter-spacing={wm.sp}
+        fill={ink}>{r.text}</text
+      >
+    {/each}
   {/if}
 {:else}
   <rect {x} {y} width={w} height={h} {rx} fill={t.panel} />

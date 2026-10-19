@@ -111,8 +111,10 @@
               {:else if p.wordmark}
                 <span
                   class="wm"
+                  class:stack={p.wordmark.lines}
+                  aria-label={p.name}
                   style="font-family:{webStack(p.wordmark.font)};font-weight:{p.wordmark.weight ?? 400};letter-spacing:{p.wordmark.spacing ?? 0}em"
-                  >{p.name}</span
+                  >{#each p.wordmark.lines ?? [p.name] as l}<span>{l}</span>{/each}</span
                 >
               {:else}
                 <span class="wm">{p.name}</span>
@@ -279,6 +281,14 @@
     font-size: 13px;
     line-height: 1.2;
     color: #5f574f;
+  }
+  /* stacked wordmark: each line on its own row, left-aligned block */
+  .partners .wm.stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    font-size: 30px;
+    line-height: 0.98;
   }
   .partners .wm {
     font-size: 22px;

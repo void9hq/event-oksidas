@@ -38,8 +38,9 @@ export const event = {
   partners: [
     { name: 'Lietuvos kultūros taryba', logo: ltktLogo, url: 'https://www.ltkt.lt', caption: 'Projektą finansuoja' },
     { name: 'Anykščių kultūros centras', logo: akcLogo, url: 'https://www.anyksciukc.lt' },
-    // no logo files yet: name set as a wordmark (font = key from fonts.js, spacing in em)
-    { name: 'STRUCTURUM', wordmark: { font: 'michroma', weight: 400, spacing: 0.12 } },
+    // no logo files yet: name set as a wordmark (font = key from fonts.js, spacing in em,
+    // lines = stacked left-aligned block)
+    { name: 'STRUCTURUM', wordmark: { font: 'saira', weight: 400, spacing: 0.04, lines: ['STRUC', 'TURUM'] } },
     { name: '3022', wordmark: { font: 'unbounded', weight: 800, spacing: 0.02 } },
   ],
 };

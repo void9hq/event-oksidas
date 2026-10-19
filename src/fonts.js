@@ -7,7 +7,7 @@ import px400 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400-norma
 import px400x from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-ext-400-normal.woff2?inline';
 import px600 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff2?inline';
 import px600x from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-ext-600-normal.woff2?inline';
-import mi400 from '@fontsource/michroma/files/michroma-latin-400-normal.woff2?inline';
+import sa400 from '@fontsource/saira/files/saira-latin-400-normal.woff2?inline';
 import ub800 from '@fontsource/unbounded/files/unbounded-latin-800-normal.woff2?inline';
 
 const RANGE_LATIN =
@@ -33,11 +33,12 @@ export const FONTS = {
       { weight: 600, latin: px600, ext: px600x },
     ],
   },
-  michroma: {
-    family: 'OxMichroma',
-    web: 'Michroma',
+  // squared grotesque, close to the STRUCTURUM sign
+  saira: {
+    family: 'OxSaira',
+    web: 'Saira',
     fallback: 'sans-serif',
-    faces: [{ weight: 400, latin: mi400 }],
+    faces: [{ weight: 400, latin: sa400 }],
   },
   unbounded: {
     family: 'OxUnbounded',
