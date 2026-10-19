@@ -50,7 +50,8 @@
   <header class="top wrap">
     <span><span class="org">{ev.organizer}</span> <span class="muted">{ev.presents}</span></span>
     <span class="topdate"
-      >{dateStr(ev)}{#if ev.price}<span class="sl">//</span><span class="price">{ev.price}</span>{/if}</span
+      ><span>{dateStr(ev)}</span>{#if ev.price}<span class="pr"><span class="sl">//</span><span class="price">{ev.price}</span></span
+        >{/if}</span
     >
   </header>
 
@@ -183,6 +184,21 @@
   .topdate {
     font-weight: 600;
   }
+  /* phones: date and price on separate lines, right-aligned */
+  @media (max-width: 600px) {
+    .top {
+      align-items: flex-start;
+    }
+    .topdate {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      text-align: right;
+    }
+    .topdate .sl {
+      margin-left: 0;
+    }
+  }
   .hero {
     padding-top: 8px;
   }
@@ -299,5 +315,17 @@
     min-height: 0;
     max-width: 100%;
     max-height: 100%;
+  }
+  /* phones: 2x2 grid instead of a single column */
+  @media (max-width: 600px) {
+    .partners {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .partners .plate {
+      width: 100%;
+      padding-inline: 12px;
+    }
   }
 </style>
