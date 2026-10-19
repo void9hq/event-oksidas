@@ -1,0 +1,23 @@
+# Run:    ADMIN_PASSWORD='something-long' docker compose up -d --build
+#         (or put ADMIN_PASSWORD=... into .env next to this file)
+# Site:   http://<host>:8080      Admin: http://<host>:8080/admin  (user: admin)
+#
+# Put it behind your HTTPS reverse proxy (Caddy / nginx / Traefik) before going public:
+# the admin password and visitors' personal data must not travel over plain HTTP.
+# Data lives in the "rsvp-data" volume; back up with
+#   docker compose cp oksidas:/data/rsvp.db ./rsvp-backup.db
+services:
+  oksidas:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      BASE_COUNT: "17" # registrations collected before the site went live
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD}
+      TRUST_PROXY: "1" # client IP from X-Forwarded-For (rate limit); set "0" if exposed directly
+    volumes:
+      - rsvp-data:/data
+
+volumes:
+  rsvp-data:

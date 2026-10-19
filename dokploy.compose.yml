@@ -1,0 +1,28 @@
+# Dokploy: Compose service, provider "Raw", paste this file.
+# The image is built straight from the GitHub repo, so no git provider is needed in Dokploy
+# (works because the repo is public; a private repo would need credentials on the server).
+#
+# Dokploy settings:
+#   Environment tab:  ADMIN_PASSWORD=<something long>
+#   Domains tab:      your domain -> service "oksidas", port 8080, HTTPS on
+# Redeploy pulls the latest commit of main. Pin a tag/commit by changing "#main".
+#
+# Data lives in the "rsvp-data" volume. Backup:
+#   docker cp $(docker ps -qf name=oksidas):/data/rsvp.db ./rsvp-backup.db
+services:
+  oksidas:
+    build: https://github.com/void9hq/oksidas.git#main
+    restart: unless-stopped
+    expose:
+      - "8080"
+    environment:
+      BASE_COUNT: "17" # registrations collected before the site went live
+      # empty = /admin disabled (503), the site itself still works
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # behind Dokploy's Traefik: client IP from X-Forwarded-For (used for rate limiting)
+      TRUST_PROXY: "1"
+    volumes:
+      - rsvp-data:/data
+
+volumes:
+  rsvp-data:

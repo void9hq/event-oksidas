@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dist-site/
+shots/
+# local RSVP database: personal data, never commit
+data/
+*.db
+*.db-shm
+*.db-wal
+.env
+.DS_Store
