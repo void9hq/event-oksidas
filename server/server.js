@@ -8,6 +8,7 @@
 //   ADMIN_USER      admin
 //   ADMIN_PASSWORD  required for /admin; admin is disabled when empty
 //   TRUST_PROXY     1 = take client IP from X-Forwarded-For (only behind your own reverse proxy)
+//   TRUST_CLOUDFLARE 1 = use CF-Connecting-IP when the request came from a Cloudflare edge
 //   STATIC_DIR      ../dist-site
 import http from 'node:http';
 import fs from 'node:fs';
@@ -15,6 +16,7 @@ import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { BlockList, isIP, isIPv4 } from 'node:net';
 import { DatabaseSync } from 'node:sqlite';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -24,6 +26,7 @@ const BASE_COUNT = Number(process.env.BASE_COUNT ?? 0) || 0;
 const ADMIN_USER = process.env.ADMIN_USER ?? 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? '';
 const TRUST_PROXY = process.env.TRUST_PROXY === '1';
+const TRUST_CLOUDFLARE = process.env.TRUST_CLOUDFLARE === '1';
 const STATIC_DIR = path.resolve(process.env.STATIC_DIR ?? path.join(here, '../dist-site'));
 
 // ---- storage ----------------------------------------------------------------------------------
@@ -113,16 +116,42 @@ setInterval(() => {
   for (const [ip, a] of hits) if (a.every((t) => now - t >= WINDOW_MS)) hits.delete(ip);
 }, WINDOW_MS).unref();
 
+// Cloudflare edge ranges (https://www.cloudflare.com/ips, fetched 2026-10). They change rarely;
+// if they do, a request from a new edge just falls back to the edge IP — rate limits get coarser,
+// nothing breaks.
+const CF_V4 = ['173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18',
+  '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17',
+  '162.158.0.0/15', '104.16.0.0/13', '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22'];
+const CF_V6 = ['2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32', '2405:8100::/32',
+  '2a06:98c0::/29', '2c0f:f248::/32'];
+const cfNets = new BlockList();
+for (const c of CF_V4) cfNets.addSubnet(c.split('/')[0], Number(c.split('/')[1]), 'ipv4');
+for (const c of CF_V6) cfNets.addSubnet(c.split('/')[0], Number(c.split('/')[1]), 'ipv6');
+
+const normIp = (ip) => (ip.startsWith('::ffff:') && isIPv4(ip.slice(7)) ? ip.slice(7) : ip);
+const isCloudflare = (ip) => {
+  const v = isIP(ip);
+  return v ? cfNets.check(ip, v === 4 ? 'ipv4' : 'ipv6') : false;
+};
+
 function clientIp(req) {
+  // peer = whoever connected to us, or to our own reverse proxy when TRUST_PROXY is on
+  let peer = normIp(req.socket.remoteAddress ?? '?');
   if (TRUST_PROXY) {
     // last entry is the one our own proxy appended; earlier ones are client-controlled
     const xff = String(req.headers['x-forwarded-for'] ?? '')
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
-    if (xff.length) return xff.at(-1);
+    if (xff.length) peer = normIp(xff.at(-1));
   }
-  return req.socket.remoteAddress ?? '?';
+  // CF-Connecting-IP is only believed when the peer really is a Cloudflare edge,
+  // so hitting the origin directly can't spoof it
+  if (TRUST_CLOUDFLARE && isCloudflare(peer)) {
+    const cf = String(req.headers['cf-connecting-ip'] ?? '').trim();
+    if (isIP(cf)) return normIp(cf);
+  }
+  return peer;
 }
 
 // ---- admin ------------------------------------------------------------------------------------

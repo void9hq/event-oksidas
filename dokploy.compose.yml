@@ -1,6 +1,7 @@
 # Dokploy: Compose service, provider "Raw", paste this file.
-# The image is built straight from the GitHub repo, so no git provider is needed in Dokploy
-# (works because the repo is public; a private repo would need credentials on the server).
+# The image is built straight from the public GitHub repo, so no git provider is needed in Dokploy.
+# Create the service as Raw from the start: switching an existing git-based service to Raw puts
+# .env in the wrong folder and ADMIN_PASSWORD is never set (Dokploy issue #2777).
 #
 # Dokploy settings:
 #   Environment tab:  ADMIN_PASSWORD=<something long>
@@ -11,7 +12,7 @@
 #   docker cp $(docker ps -qf name=oksidas):/data/rsvp.db ./rsvp-backup.db
 services:
   oksidas:
-    build: https://github.com/void9hq/oksidas.git#main
+    build: https://github.com/void9hq/event-oksidas.git#main
     restart: unless-stopped
     expose:
       - "8080"
@@ -19,8 +20,11 @@ services:
       BASE_COUNT: "17" # registrations collected before the site went live
       # empty = /admin disabled (503), the site itself still works
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      # behind Dokploy's Traefik: client IP from X-Forwarded-For (used for rate limiting)
+      # client IP for rate limiting: Cloudflare -> Dokploy's Traefik -> this container.
+      # TRUST_PROXY reads the peer Traefik saw; TRUST_CLOUDFLARE then takes CF-Connecting-IP,
+      # but only if that peer is a Cloudflare edge.
       TRUST_PROXY: "1"
+      TRUST_CLOUDFLARE: "1"
     volumes:
       - rsvp-data:/data
 
