@@ -4,7 +4,7 @@
 # .env in the wrong folder and ADMIN_PASSWORD is never set (Dokploy issue #2777).
 #
 # Dokploy settings:
-#   Environment tab:  ADMIN_PASSWORD=<something long>
+#   Environment tab:  paste .env.example, set ADMIN_PASSWORD
 #   Domains tab:      your domain -> service "oksidas", port 8080, HTTPS on
 # Redeploy pulls the latest commit of main. Pin a tag/commit by changing "#main".
 #
@@ -17,7 +17,9 @@ services:
     expose:
       - "8080"
     environment:
-      BASE_COUNT: "17" # registrations collected before the site went live
+      # values come from Dokploy's Environment tab, see .env.example
+      BASE_COUNT: ${BASE_COUNT:-17} # registrations collected before the site went live
+      ADMIN_USER: ${ADMIN_USER:-admin}
       # empty = /admin disabled (503), the site itself still works
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       # client IP for rate limiting: Cloudflare -> Dokploy's Traefik -> this container.
