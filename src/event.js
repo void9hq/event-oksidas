@@ -27,7 +27,7 @@ export const event = {
     'Tadas Dailyda',
     'Ignas Andriuškevičius',
     'Gabrielius Klemas',
-    'Adomas Lapinkas',
+    'Ugnė Skaisgirė',
     'Antanas Stankevičius',
     'Mindaugas Badokas',
     'VNKJS',
