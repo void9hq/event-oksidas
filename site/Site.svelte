@@ -125,8 +125,6 @@
       </ul>
     </section>
   {/if}
-
-  <footer class="wrap muted">{ev.organizer} / {ev.date}</footer>
 </div>
 
 <style>
@@ -301,9 +299,5 @@
     min-height: 0;
     max-width: 100%;
     max-height: 100%;
-  }
-  footer {
-    padding-bottom: 32px;
-    font-size: 14px;
   }
 </style>
