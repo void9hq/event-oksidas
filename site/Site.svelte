@@ -6,6 +6,8 @@
   import { dateStr, whenSub } from '../src/lib/util.js';
   import { webStack } from '../src/fonts.js';
   import Wave from '../src/lib/Wave.svelte';
+  import { frontFold } from '../src/lib/wavemath.js';
+  import { createTone, toneSupported, NOTES } from './tone.js';
   import Rsvp from './Rsvp.svelte';
 
   const THEME = 'rust';
@@ -16,28 +18,108 @@
     .map(([k, v]) => `--${k}:${v}`)
     .join(';');
 
-  // Wave parallax: pointer position -> --px/--py (-1..1), eased per frame; the loop stops once settled.
+  // ---- the hero wave is playable --------------------------------------------------------------
+  //  - parallax: pointer -> --px/--py on the band (CSS does the per-trace shift)
+  //  - knob: pointer x = fold amount, pointer y = cycles across the band (and pitch when sound is on)
+  //  - drift: the pattern travels slowly; faster while the tone plays
+  //  - tone: button toggles a one-voice synth built from the same recipe (tone.js)
+  // One rAF loop, only while the band is on screen. Reduced motion: no parallax, no drift.
   const PARALLAX = 70; // max shift of the front trace, svg units (band is 1600 wide)
+  const SEED_NOTE = 0.5; // pointer resting position until the first move (centre = the poster look)
+
+  const live = $state({ phase: 0, fold: 1, freq: 1, amp: 1, hot: 0 }); // Wave.svelte redraws on change
   let waveEl;
+  let canSound = $state(false);
+  let sound = $state(false);
+
+  const tone = createTone(SEED);
+  let nx = SEED_NOTE; // pointer over the viewport, 0..1
+  let ny = SEED_NOTE;
+  let sentNote = -1;
+  let sentK = 0;
+  const targetNote = () => Math.min(NOTES - 1, Math.max(0, Math.floor((1 - ny) * NOTES)));
+
+  async function toggleSound() {
+    if (sound) {
+      sound = false;
+      tone.stop();
+      return;
+    }
+    sentNote = targetNote();
+    sentK = frontFold(t, live.fold);
+    sound = await tone.start(sentNote, sentK);
+  }
+
   onMount(() => {
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    let tx = 0, ty = 0, cx = 0, cy = 0, raf = 0;
-    const tick = () => {
-      cx += (tx - cx) * 0.08;
-      cy += (ty - cy) * 0.08;
-      waveEl.style.setProperty('--px', cx.toFixed(4));
-      waveEl.style.setProperty('--py', cy.toFixed(4));
-      raf = Math.abs(tx - cx) + Math.abs(ty - cy) > 0.001 ? requestAnimationFrame(tick) : 0;
+    canSound = toneSupported();
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let px = 0, py = 0; // eased parallax
+    let visible = false;
+    let raf = 0;
+    let last = 0;
+
+    const frame = (now) => {
+      const dt = Math.min(0.05, (now - last) / 1000 || 0.016);
+      last = now;
+      const ease = 1 - Math.exp(-dt * 5);
+
+      if (!still) {
+        px += (nx * 2 - 1 - px) * ease;
+        py += (ny * 2 - 1 - py) * ease;
+        waveEl.style.setProperty('--px', px.toFixed(4));
+        waveEl.style.setProperty('--py', py.toFixed(4));
+      }
+
+      // knob targets: centre of the screen = the poster look (1, 1)
+      const foldT = 0.4 + 1.2 * nx;
+      const freqT = sound ? 0.5 + targetNote() / (NOTES - 1) : 1.5 - ny;
+      live.fold += (foldT - live.fold) * ease;
+      live.freq += (freqT - live.freq) * ease;
+
+      const hotT = sound ? 1 : 0;
+      live.hot += (hotT - live.hot) * (1 - Math.exp(-dt * 6));
+      live.amp = 1 + 0.15 * live.hot;
+      if (!still) live.phase += dt * (0.22 + 1.6 * live.hot);
+
+      if (sound) {
+        const n = targetNote();
+        const k = frontFold(t, live.fold);
+        if (n !== sentNote || Math.abs(k - sentK) > 0.05) {
+          tone.set(n, k);
+          sentNote = n;
+          sentK = k;
+        }
+      }
+      raf = visible ? requestAnimationFrame(frame) : 0;
     };
+
     const move = (e) => {
-      tx = (e.clientX / innerWidth) * 2 - 1;
-      ty = (e.clientY / innerHeight) * 2 - 1;
-      raf ||= requestAnimationFrame(tick);
+      nx = e.clientX / innerWidth;
+      ny = e.clientY / innerHeight;
     };
+    const quiet = () => {
+      if (!sound) return;
+      sound = false;
+      tone.stop();
+    };
+    const io = new IntersectionObserver(([e]) => {
+      visible = e.isIntersecting;
+      if (visible) {
+        last = performance.now();
+        raf ||= requestAnimationFrame(frame);
+      } else {
+        quiet(); // the wave is the instrument: off screen, no drone
+      }
+    });
+    io.observe(waveEl);
     addEventListener('pointermove', move, { passive: true });
+    document.addEventListener('visibilitychange', () => document.hidden && quiet());
+
     return () => {
+      io.disconnect();
       removeEventListener('pointermove', move);
       cancelAnimationFrame(raf);
+      quiet();
     };
   });
 
@@ -60,11 +142,20 @@
     <p class="sub">{ev.subtitle}</p>
   </section>
 
-  <div class="wave" aria-hidden="true" bind:this={waveEl}>
-    <!-- traces drawn wider than the view so shifted ends never show; ticks kept static -->
-    <svg viewBox="0 0 1600 260" preserveAspectRatio="xMidYMid slice">
-      <Wave x={-100} y={0} w={1800} h={260} seed={SEED} {t} parallax={PARALLAX} />
-    </svg>
+  <div class="stage">
+    <div class="wave" aria-hidden="true" bind:this={waveEl}>
+      <!-- traces drawn wider than the view so shifted ends never show; ticks kept static -->
+      <svg viewBox="0 0 1600 260" preserveAspectRatio="xMidYMid slice">
+        <Wave x={-100} y={0} w={1800} h={260} seed={SEED} {t} parallax={PARALLAX} N={360} {live} />
+      </svg>
+    </div>
+    {#if canSound}
+      <div class="tonebar wrap">
+        <button class="tone" aria-pressed={sound} onclick={toggleSound}>
+          <span class="sl">//</span>{sound ? 'Sustabdyti' : 'Paleisti toną'}
+        </button>
+      </div>
+    {/if}
   </div>
 
   <section class="info wrap">
@@ -213,10 +304,58 @@
     font-size: clamp(22px, 4vw, 40px);
     line-height: 1.2;
   }
+  /* Parallax shifts the traces, so they must be allowed to draw outside the svg box (the strongest
+     traces already reach the box edge). Height follows width (16.25vw = 260/1600), so "slice" only
+     crops sideways on phones. clip-path trims the sides to the page, the generous top/bottom
+     inset keeps the shifted traces whole. */
+  .wave {
+    clip-path: inset(-120px 0);
+  }
+  .stage {
+    position: relative;
+  }
+  /* sound toggle: over the lower right of the band, aligned to the content column */
+  .tonebar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 6px;
+    display: flex;
+    justify-content: flex-end;
+    pointer-events: none;
+  }
+  .tone {
+    pointer-events: auto;
+    font: 600 13px var(--body);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 10px 14px;
+    cursor: pointer;
+  }
+  .tone .sl {
+    font: 700 1em var(--head);
+    letter-spacing: 0;
+    margin-right: 0.6em;
+  }
+  .tone[aria-pressed='true'] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+  .tone:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
   .wave svg {
     display: block;
     width: 100%;
-    height: clamp(120px, 18vw, 260px);
+    height: clamp(120px, 16.25vw, 520px);
+    overflow: visible;
+    pointer-events: none;
   }
   section {
     margin-bottom: 56px;
