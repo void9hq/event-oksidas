@@ -4,8 +4,9 @@
   import A4 from './layouts/A4.svelte';
   import Wide from './layouts/Wide.svelte';
   import Square from './layouts/Square.svelte';
+  import Carousel from './layouts/Carousel.svelte';
 
-  const LAYOUTS = { a4: A4, wide: Wide, square: Square };
+  const LAYOUTS = { a4: A4, wide: Wide, square: Square, carousel: Carousel };
 
   let { format, theme: t, ev, seed, svgEl = $bindable() } = $props();
 
@@ -29,5 +30,5 @@
   {#if t.grid > 0}
     <rect width={W} height={H} fill="url(#{P}-grid)" opacity={t.grid} />
   {/if}
-  <Layout {W} {H} {ev} {t} {P} {seed} />
+  <Layout {W} {H} {ev} {t} {P} {seed} {format} />
 </svg>

@@ -1,6 +1,6 @@
 <script>
   import Artwork from './Artwork.svelte';
-  import { event } from './event.js';
+  import { event, eventEn } from './event.js';
   import { themes } from './themes.js';
   import { formats } from './formats.js';
   import { saveSvg, savePng } from './export.js';
@@ -18,7 +18,32 @@
   });
 
   const fname = (f) => `oksidas-${f.id}-${themeId}-${seed}`;
+  const evFor = (f) => (f.lang === 'en' ? eventEn : event);
+
+  // formats without a group get their own cell; grouped ones share a full-width row
+  const cells = $derived.by(() => {
+    const out = [];
+    for (const f of formats) {
+      const last = out.at(-1);
+      if (f.group && last?.group === f.group) last.items.push(f);
+      else out.push({ group: f.group, items: [f] });
+    }
+    return out;
+  });
 </script>
+
+{#snippet card(f)}
+  <section class={f.layout} data-id={f.id}>
+    <div class="bar">
+      <span>{f.label} / {f.w}×{f.h}</span>
+      <button onclick={() => saveSvg(els[f.id], fname(f))}>SVG</button>
+      <button onclick={() => savePng(els[f.id], f.w, f.h, fname(f))}>PNG</button>
+    </div>
+    <div class="frame">
+      <Artwork format={f} {theme} ev={evFor(f)} {seed} bind:svgEl={els[f.id]} />
+    </div>
+  </section>
+{/snippet}
 
 <header>
   <strong>OKSIDAS</strong>
@@ -42,17 +67,14 @@
 </header>
 
 <main>
-  {#each formats as f}
-    <section class={f.layout}>
-      <div class="bar">
-        <span>{f.label} / {f.w}×{f.h}</span>
-        <button onclick={() => saveSvg(els[f.id], fname(f))}>SVG</button>
-        <button onclick={() => savePng(els[f.id], f.w, f.h, fname(f))}>PNG</button>
+  {#each cells as c}
+    {#if c.group}
+      <div class="row">
+        {#each c.items as f}{@render card(f)}{/each}
       </div>
-      <div class="frame">
-        <Artwork format={f} {theme} ev={event} {seed} bind:svgEl={els[f.id]} />
-      </div>
-    </section>
+    {:else}
+      {@render card(c.items[0])}
+    {/if}
   {/each}
 </main>
 
@@ -117,8 +139,21 @@
     gap: 24px;
     padding: 24px;
   }
-  section.wide {
+  section.wide,
+  .row {
     grid-column: 1 / -1;
+  }
+  /* carousel slides touch, so the running wave reads as one strip */
+  .row {
+    display: flex;
+    gap: 0;
+  }
+  .row .bar {
+    padding-right: 12px;
+  }
+  .carousel .frame :global(svg) {
+    width: min(30vw, 45vh);
+    height: auto;
   }
   .bar {
     display: flex;

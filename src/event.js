@@ -4,6 +4,7 @@
 // posters (hidden on site).
 import ltktLogo from './assets/logos/ltkt.svg?inline'; // official pack: ltkt.lt DUK, black RGB variant
 import akcLogo from './assets/logos/anyksciu-kc.png?inline'; // from anyksciukc.lt header
+import ltktLogoEn from './assets/logos/ltkt-en.svg?inline'; // same pack, English version
 
 export const event = {
   title: 'OKSIDAS',
@@ -43,4 +44,37 @@ export const event = {
     { name: 'STRUCTURUM', wordmark: { font: 'saira', weight: 400, spacing: 0.04, lines: ['STRUC', 'TURUM'] } },
     { name: '3022', wordmark: { font: 'unbounded', weight: 800, spacing: 0.02 } },
   ],
+};
+
+// English copy for the Instagram carousel. Speakers, date and partner order come from `event`,
+// only the words are overridden, so edits above carry over.
+const PARTNERS_EN = {
+  'Lietuvos kultūros taryba': { name: 'Lithuanian Council for Culture', logo: ltktLogoEn, caption: 'Project funded by' },
+  'Anykščių kultūros centras': { name: 'Anykščiai Cultural Centre' },
+};
+const EXCLUDE_EN = ['STRUCTURUM'];
+
+export const eventEn = {
+  ...event,
+  locale: 'en-GB', // weekday name
+  subtitle: 'Music & technology weekend',
+  presents: 'presents',
+  price: 'Free entry',
+  whenLabel: 'When',
+  whereLabel: 'Where',
+  venue: 'Anykščiai Cultural Centre',
+  city: 'Anykščiai, Lithuania',
+  speakersLabel: 'Speakers',
+  partnersLabel: 'Partners',
+  registerLabel: 'Register',
+  // speakers slide: deliberate "bad design" joke, this name is clipped as if its text box was
+  // too narrow. keep = visible part. Remove to show the full name.
+  speakerCut: { name: 'Mindaugas Badokas', keep: 'Mindaugas Ba' },
+  // line under the speakers on the carousel; remove to hide
+  speakersExtra: { main: 'Private workshops & afterparty', place: 'Saugus atstumas, Mackeliškiai' },
+  url: 'oksidas.void9.com',
+  // carousel shows three partners; STRUCTURUM stays on the Lithuanian posters and site
+  partners: event.partners
+    .filter((p) => !EXCLUDE_EN.includes(p.name))
+    .map((p) => ({ ...p, ...PARTNERS_EN[p.name] })),
 };

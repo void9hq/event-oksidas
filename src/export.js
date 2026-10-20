@@ -16,7 +16,8 @@ export function saveSvg(el, name) {
   download(new Blob([svgString(el)], { type: 'image/svg+xml' }), `${name}.svg`);
 }
 
-export async function savePng(el, w, h, name) {
+// Rasterize the SVG element at w x h px. Also used by scripts/export.mjs (headless).
+export async function pngBlob(el, w, h) {
   const url = URL.createObjectURL(new Blob([svgString(el)], { type: 'image/svg+xml' }));
   try {
     const img = new Image();
@@ -28,9 +29,21 @@ export async function savePng(el, w, h, name) {
     c.width = w;
     c.height = h;
     c.getContext('2d').drawImage(img, 0, 0, w, h);
-    const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
-    download(blob, `${name}.png`);
+    return await new Promise((r) => c.toBlob(r, 'image/png'));
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+export async function savePng(el, w, h, name) {
+  download(await pngBlob(el, w, h), `${name}.png`);
+}
+
+// base64 PNG without the data: prefix, for handing back to a Node script
+export async function pngBase64(el, w, h) {
+  const blob = await pngBlob(el, w, h);
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
 }
