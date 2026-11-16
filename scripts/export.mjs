@@ -1,6 +1,11 @@
 // Headless export of the posters: A4, Instagram 1:1, Facebook cover, as SVG + PNG.
 //   npm run export                          all formats, default theme, to ./out
 //   npm run export -- --theme paper --seed 42 --only a4,square --out ./print --no-png
+//   npm run export -- --only uv --subtitle "Music & technology weekend 2026"
+//   npm run export -- --only uv --uv-theme sun        (ids: print themes in src/themes.js)
+//
+// --subtitle replaces the subtitle on every exported format (so combine it with --only unless
+// you want the same line on the Lithuanian and English designs).
 //
 // Starts the poster generator (vite) on a free port, drives it with Chrome through
 // playwright-core and writes the files. Uses the same render and rasterize code as the
@@ -21,6 +26,8 @@ const { values: o } = parseArgs({
   options: {
     theme: { type: 'string', default: 'rust' }, // id from src/themes.js
     seed: { type: 'string', default: '7' },
+    'uv-theme': { type: 'string', default: 'uv' }, // white print theme for the uv format (themes.js, print: true)
+    subtitle: { type: 'string' }, // overrides the subtitle line
     only: { type: 'string' }, // comma list of format ids from src/formats.js: a4,square,fb
     out: { type: 'string', default: 'out' },
     'no-svg': { type: 'boolean', default: false },
@@ -31,9 +38,13 @@ const { values: o } = parseArgs({
 
 if (o.help) {
   console.log(
-    'npm run export -- [--theme rust|patina|paper|mono] [--seed N] [--only a4,square,fb,carousel-1,...] [--out dir] [--no-svg] [--no-png]',
+    'npm run export -- [--theme rust|patina|paper|mono] [--uv-theme uv|sun|verdigris|cobalt|magenta|violet|ink|ocean|forest] [--seed N] [--subtitle "text"] [--only a4,square,fb,uv,carousel-1,...] [--out dir] [--no-svg] [--no-png]',
   );
   process.exit(0);
+}
+if (o.subtitle !== undefined && !o.subtitle.trim()) {
+  console.error('--subtitle must not be empty (leave it out to keep the default).');
+  process.exit(1);
 }
 if (o['no-svg'] && o['no-png']) {
   console.error('Nothing to do: both --no-svg and --no-png given.');
@@ -73,8 +84,13 @@ try {
   // format list comes from the app itself, so a new format in formats.js is picked up
   const { formats } = await server.ssrLoadModule('/src/formats.js');
   const { themes } = await server.ssrLoadModule('/src/themes.js');
-  if (!themes.some((t) => t.id === o.theme)) {
-    throw new Error(`Unknown theme "${o.theme}". Available: ${themes.map((t) => t.id).join(', ')}`);
+  const screen = themes.filter((t) => !t.print).map((t) => t.id);
+  const print = themes.filter((t) => t.print).map((t) => t.id);
+  if (!screen.includes(o.theme)) {
+    throw new Error(`Unknown theme "${o.theme}". Available: ${screen.join(', ')}`);
+  }
+  if (!print.includes(o['uv-theme'])) {
+    throw new Error(`Unknown UV theme "${o['uv-theme']}". Available: ${print.join(', ')}`);
   }
   const want = o.only ? o.only.split(',').map((s) => s.trim()) : formats.map((f) => f.id);
   const unknown = want.filter((id) => !formats.some((f) => f.id === id));
@@ -86,14 +102,16 @@ try {
   browser = await launch();
   const page = await browser.newPage({ viewport: { width: 1600, height: 1100 } });
   page.on('pageerror', (e) => console.error('page error:', e.message));
-  await page.goto(`${base}/#theme=${o.theme}&seed=${o.seed}`);
+  const state = new URLSearchParams({ theme: o.theme, seed: o.seed, uv: o['uv-theme'] });
+  if (o.subtitle) state.set('subtitle', o.subtitle);
+  await page.goto(`${base}/#${state}`);
   // fonts and wordmark/speaker measuring settle after the first render
   await page.waitForFunction(() => document.querySelectorAll('svg').length > 0);
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(1200);
 
   for (const f of formats.filter((f) => want.includes(f.id))) {
-    const base = `oksidas-${f.id}-${o.theme}-${o.seed}`;
+    const base = `oksidas-${f.id}-${f.themeGroup === 'print' ? o['uv-theme'] : o.theme}-${o.seed}`;
     const sel = `section[data-id="${f.id}"] svg`;
     if (!o['no-svg']) {
       const svg = await page.evaluate(async (sel) => {

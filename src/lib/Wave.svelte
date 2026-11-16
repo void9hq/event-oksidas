@@ -9,9 +9,11 @@
   // 0 (posters) emits no style at all, so exported SVGs stay static.
   // N: points per trace; raise it for bands much wider than the view (carousel panorama).
   // live: website only, animated state { phase, fold, freq, amp, hot }; see wavemath.js.
-  let { x, y, w, h, seed, t, ticks = true, parallax = 0, N = 600, live = undefined } = $props();
+  // weight: line width multiplier (1 = as on screen).
+  // overlay: { color, dx, dy, width? } draws a copy of the front trace on top, offset by dx/dy.
+  let { x, y, w, h, seed, t, ticks = true, parallax = 0, N = 600, live = undefined, weight = 1, overlay = undefined } = $props();
 
-  const traces = $derived(tracePaths({ x, y, w, h, seed, t, N, parallax, live }));
+  const traces = $derived(tracePaths({ x, y, w, h, seed, t, N, parallax, live, weight }));
 
   const tickXs = $derived(Array.from({ length: 41 }, (_, i) => x + (i * w) / 40));
 </script>
@@ -27,4 +29,14 @@
   {#each traces as tr}
     <path d={tr.d} stroke={tr.color} stroke-width={tr.width} opacity={tr.opacity} style={tr.style} />
   {/each}
+  {#if overlay && traces.length}
+    <!-- copy of the front trace on top, shifted: like the headline's offset shadow, in reverse -->
+    {@const front = traces.at(-1)}
+    <path
+      d={front.d}
+      stroke={overlay.color}
+      stroke-width={front.width * (overlay.width ?? 1)}
+      transform="translate({overlay.dx ?? 0} {overlay.dy ?? 0})"
+    />
+  {/if}
 </g>

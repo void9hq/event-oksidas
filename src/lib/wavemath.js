@@ -25,7 +25,9 @@ export const frontFold = (t, foldMul = 1) => 1 + t.wave.fold * foldMul * 5;
 //   freq   multiplies cycles across the band (knob / pitch)
 //   amp    multiplies amplitude
 //   hot    0..1, makes the front trace thicker (sound on)
-export function tracePaths({ x, y, w, h, seed, t, N = 600, parallax = 0, live }) {
+// weight multiplies the line widths (print wants heavier lines than screens).
+// t.wave.floor (default 0.2) is the opacity of the faintest back trace.
+export function tracePaths({ x, y, w, h, seed, t, N = 600, parallax = 0, live, weight = 1 }) {
   const { f1: f1b, f2: f2b, a2, ph, ph2, m } = waveParams(seed);
   const n = t.wave.lines;
   const freq = live?.freq ?? 1;
@@ -35,6 +37,7 @@ export function tracePaths({ x, y, w, h, seed, t, N = 600, parallax = 0, live })
   const f1 = f1b * freq;
   const f2 = f2b * freq;
   const amp = h * 0.42 * (live?.amp ?? 1);
+  const floor = t.wave.floor ?? 0.2;
   const TAU = 2 * Math.PI;
 
   const out = [];
@@ -60,8 +63,8 @@ export function tracePaths({ x, y, w, h, seed, t, N = 600, parallax = 0, live })
         ? `transform:translate(calc(var(--px,0)*${depth.toFixed(1)}px),calc(var(--py,0)*${(depth * 0.35).toFixed(1)}px))`
         : undefined,
       color: last ? t.accent2 : t.accent,
-      width: h * (last ? 0.008 * (1 + 0.8 * hot) : 0.0035),
-      opacity: last ? 1 : t.wave.opacity * (0.2 + 0.8 * p),
+      width: h * (last ? 0.008 * (1 + 0.8 * hot) : 0.0035) * weight,
+      opacity: last ? 1 : t.wave.opacity * (floor + (1 - floor) * p),
     });
   }
   return out;

@@ -1,24 +1,35 @@
 <script>
   import Artwork from './Artwork.svelte';
   import { event, eventEn } from './event.js';
-  import { themes } from './themes.js';
+  import { themes, screenThemes, printThemes } from './themes.js';
   import { formats } from './formats.js';
   import { saveSvg, savePng } from './export.js';
 
-  // state survives reloads via URL hash: #theme=rust&seed=7
+  // state survives reloads via URL hash: #theme=rust&seed=7&uv=sun&subtitle=Optional+override
   const q = new URLSearchParams(location.hash.slice(1));
-  let themeId = $state(q.get('theme') ?? themes[0].id);
+  let themeId = $state(q.get('theme') ?? screenThemes[0].id);
+  let uvId = $state(q.get('uv') ?? printThemes[0].id); // theme of the UV print card
   let seed = $state(Number(q.get('seed') ?? 7));
+  const subtitle = q.get('subtitle')?.trim() || ''; // replaces the subtitle on every format (npm run export --subtitle)
   const els = $state({});
 
-  const theme = $derived(themes.find((x) => x.id === themeId) ?? themes[0]);
+  const theme = $derived(themes.find((x) => x.id === themeId) ?? screenThemes[0]);
+  const printTheme = $derived(printThemes.find((x) => x.id === uvId) ?? printThemes[0]);
 
   $effect(() => {
-    history.replaceState(null, '', `#theme=${themeId}&seed=${seed}`);
+    const p = new URLSearchParams({ theme: themeId, seed: String(seed) });
+    if (printTheme.id !== printThemes[0].id) p.set('uv', printTheme.id);
+    if (subtitle) p.set('subtitle', subtitle);
+    history.replaceState(null, '', `#${p}`);
   });
 
-  const fname = (f) => `oksidas-${f.id}-${themeId}-${seed}`;
-  const evFor = (f) => (f.lang === 'en' ? eventEn : event);
+  // print formats (UV) use the print theme picked in their own card, everything else the main one
+  const themeFor = (f) => (f.themeGroup === 'print' ? printTheme : theme);
+  const fname = (f) => `oksidas-${f.id}-${themeFor(f).id}-${seed}`;
+  const evFor = (f) => {
+    const e = f.lang === 'en' ? eventEn : event;
+    return subtitle ? { ...e, subtitle } : e;
+  };
 
   // formats without a group get their own cell; grouped ones share a full-width row
   const cells = $derived.by(() => {
@@ -36,11 +47,26 @@
   <section class={f.layout} data-id={f.id}>
     <div class="bar">
       <span>{f.label} / {f.w}×{f.h}</span>
+      {#if f.themeGroup === 'print'}
+        <div class="group" role="radiogroup" aria-label="UV tema">
+          {#each printThemes as th}
+            <button
+              role="radio"
+              aria-checked={th.id === printTheme.id}
+              class:active={th.id === printTheme.id}
+              onclick={() => (uvId = th.id)}
+            >
+              <!-- dots colour as fill, wave colour as outline -->
+              <span class="sw" style="background:{th.line};border-color:{th.accent}"></span>{th.name}
+            </button>
+          {/each}
+        </div>
+      {/if}
       <button onclick={() => saveSvg(els[f.id], fname(f))}>SVG</button>
       <button onclick={() => savePng(els[f.id], f.w, f.h, fname(f))}>PNG</button>
     </div>
     <div class="frame">
-      <Artwork format={f} {theme} ev={evFor(f)} {seed} bind:svgEl={els[f.id]} />
+      <Artwork format={f} theme={themeFor(f)} ev={evFor(f)} {seed} bind:svgEl={els[f.id]} />
     </div>
   </section>
 {/snippet}
@@ -48,7 +74,7 @@
 <header>
   <strong>OKSIDAS</strong>
   <div class="group" role="radiogroup" aria-label="Tema">
-    {#each themes as th}
+    {#each screenThemes as th}
       <button
         role="radio"
         aria-checked={th.id === themeId}
@@ -99,6 +125,7 @@
   }
   .group {
     display: flex;
+    flex-wrap: wrap;
     gap: 4px;
   }
   button {
@@ -140,6 +167,7 @@
     padding: 24px;
   }
   section.wide,
+  section.uv,
   .row {
     grid-column: 1 / -1;
   }
@@ -157,6 +185,7 @@
   }
   .bar {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     align-items: center;
     margin-bottom: 6px;
@@ -171,6 +200,10 @@
   .a4 .frame :global(svg) {
     height: 80vh;
     width: auto;
+  }
+  .uv .frame :global(svg) {
+    width: min(100%, 1100px);
+    height: auto;
   }
   .square .frame :global(svg) {
     width: 45vh;

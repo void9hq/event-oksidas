@@ -5,8 +5,9 @@
   import Wide from './layouts/Wide.svelte';
   import Square from './layouts/Square.svelte';
   import Carousel from './layouts/Carousel.svelte';
+  import Uv from './layouts/Uv.svelte';
 
-  const LAYOUTS = { a4: A4, wide: Wide, square: Square, carousel: Carousel };
+  const LAYOUTS = { a4: A4, wide: Wide, square: Square, carousel: Carousel, uv: Uv };
 
   let { format, theme: t, ev, seed, svgEl = $bindable() } = $props();
 
@@ -14,7 +15,8 @@
   const H = $derived(format.h);
   const P = $derived(format.id); // id prefix, several SVGs share one document
   const Layout = $derived(LAYOUTS[format.layout]);
-  const step = $derived(Math.max(W, H) / 70);
+  const step = $derived(format.dots?.step ?? Math.max(W, H) / 70);
+  const dotR = $derived(format.dots?.r);
   const wordmarkFonts = $derived(ev.partners.map((p) => p.wordmark?.font).filter(Boolean));
 </script>
 
@@ -25,7 +27,7 @@
   width={format.physW ?? W}
   height={format.physH ?? H}
 >
-  <Defs {t} {P} {step} extraFonts={wordmarkFonts} />
+  <Defs {t} {P} {step} {dotR} extraFonts={wordmarkFonts} />
   <rect width={W} height={H} fill={t.bg} />
   {#if t.grid > 0}
     <rect width={W} height={H} fill="url(#{P}-grid)" opacity={t.grid} />
